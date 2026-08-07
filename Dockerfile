@@ -17,7 +17,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         grep \
         findutils \
         ca-certificates \
+        wget \
+        xz-utils \
     && rm -rf /var/lib/apt/lists/*
+
+# Install the Arm GNU aarch64 cross toolchain (glibc / Linux userspace variant)
+# for cross-compiling arm64 board binaries. Extracted to /opt and put on PATH so
+# aarch64-none-linux-gnu-gcc etc. are available to every user in the container.
+ARG ARM_TOOLCHAIN_URL=https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
+RUN mkdir -p /opt/arm-toolchain \
+ && wget -q -O /tmp/arm-toolchain.tar.xz "${ARM_TOOLCHAIN_URL}" \
+ && tar -xf /tmp/arm-toolchain.tar.xz -C /opt/arm-toolchain --strip-components=1 \
+ && rm /tmp/arm-toolchain.tar.xz
+ENV PATH="/opt/arm-toolchain/bin:${PATH}"
 
 # Create a non-root user matching the host user's UID/GID. This makes files
 # written to the mounted repo (build/, logs) owned by you instead of root, and
