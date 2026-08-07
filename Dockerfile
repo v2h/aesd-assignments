@@ -19,6 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         wget \
         xz-utils \
+        file \
+        rsyslog \
     && rm -rf /var/lib/apt/lists/*
 
 # Install the Arm GNU aarch64 cross toolchain (glibc / Linux userspace variant)
