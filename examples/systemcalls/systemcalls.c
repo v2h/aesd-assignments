@@ -1,4 +1,11 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -16,8 +23,9 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
-    return true;
+    if (cmd == NULL) return false;
+    const int ret = system(cmd);
+    return ret == 0 ? true : false;
 }
 
 /**
@@ -45,9 +53,7 @@ bool do_exec(int count, ...)
         command[i] = va_arg(args, char *);
     }
     command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
+    va_end(args);
 
 /*
  * TODO:
@@ -58,10 +64,38 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    // Flush stdout before fork() so any pending buffered output is not
+    // duplicated into the child's copy of the buffer.
+    fflush(stdout);
 
-    va_end(args);
+    const pid_t child_pid = fork();
+    if (child_pid == -1) {
+        perror("fork");
+        return false;
+    }
 
-    return true;
+    if (child_pid == 0) {
+        // Child: replace the process image. execv() only returns on failure
+        // (e.g. command[0] is not an absolute path to an existing binary).
+        execv(command[0], command);
+        perror("execv");
+        _exit(EXIT_FAILURE);
+    }
+
+    // Parent: wait for the child and inspect its exit status.
+    int status;
+    pid_t result;
+    do {
+        result = waitpid(child_pid, &status, 0);
+    } while (result == -1 && errno == EINTR);
+
+    if (result == -1) {
+        perror("waitpid");
+        return false;
+    }
+
+    // Success only if the child exited normally with a zero status.
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
 /**
@@ -80,10 +114,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
         command[i] = va_arg(args, char *);
     }
     command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
-
+    va_end(args);
 
 /*
  * TODO
@@ -92,8 +123,45 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    fflush(stdout);
 
-    va_end(args);
+    const pid_t child_pid = fork();
+    if (child_pid == -1) {
+        perror("fork");
+        return false;
+    }
 
-    return true;
+    if (child_pid == 0) {
+        // Child: open the output file and point stdout (fd 1) at it, then exec.
+        int fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC,
+                      S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (fd == -1) {
+            perror("open");
+            _exit(EXIT_FAILURE);
+        }
+        if (dup2(fd, STDOUT_FILENO) == -1) {
+            perror("dup2");
+            close(fd);
+            _exit(EXIT_FAILURE);
+        }
+        close(fd);
+
+        execv(command[0], command);
+        perror("execv");
+        _exit(EXIT_FAILURE);
+    }
+
+    // Parent: wait for the child and inspect its exit status.
+    int status;
+    pid_t result;
+    do {
+        result = waitpid(child_pid, &status, 0);
+    } while (result == -1 && errno == EINTR);
+
+    if (result == -1) {
+        perror("waitpid");
+        return false;
+    }
+
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
