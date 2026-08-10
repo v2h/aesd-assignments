@@ -21,6 +21,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         xz-utils \
         file \
         rsyslog \
+        sudo \
+        bc u-boot-tools kmod cpio flex bison libssl-dev psmisc flex \
+    && apt-get install -y qemu-system-arm \
     && rm -rf /var/lib/apt/lists/*
 
 # Install the Arm GNU aarch64 cross toolchain (glibc / Linux userspace variant)
@@ -44,6 +47,13 @@ RUN if ! getent group "${USER_GID}" >/dev/null; then \
         groupadd -g "${USER_GID}" "${USER_NAME}"; \
     fi \
  && useradd -m -u "${USER_UID}" -g "${USER_GID}" -s /bin/bash "${USER_NAME}"
+
+# Grant the user passwordless sudo. manual-linux.sh performs a few root-only
+# operations (mknod device nodes, chown the rootfs, rm the staging dir); this
+# lets those `sudo ...` calls run non-interactively while the rest of the build
+# runs as the unprivileged user (so files under /work stay owned by you).
+RUN echo "${USER_NAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USER_NAME} \
+ && chmod 0440 /etc/sudoers.d/${USER_NAME}
 
 # Avoid git "dubious ownership" errors on the bind-mounted repo (all users).
 RUN git config --system --add safe.directory /work \
