@@ -8,7 +8,11 @@ set -u
 NUMFILES=10
 WRITESTR=AELD_IS_FUN
 WRITEDIR=/tmp/aeld-data
-username=$(cat conf/username.txt)
+# Assignment 4: config files live at /etc/finder-app/conf on the target rootfs
+# (installed there by the buildroot aesd-assignments package), so use absolute
+# paths instead of ../conf so the script runs from any directory / from PATH.
+CONFDIR=/etc/finder-app/conf
+username=$(cat "${CONFDIR}/username.txt")
 
 if [ $# -lt 3 ]
 then
@@ -32,7 +36,7 @@ echo "Writing ${NUMFILES} files containing string ${WRITESTR} to ${WRITEDIR}"
 rm -rf "${WRITEDIR}"
 
 # create $WRITEDIR if not assignment1
-assignment=`cat ../conf/assignment.txt`
+assignment=$(cat "${CONFDIR}/assignment.txt")
 
 if [ $assignment != 'assignment1' ]
 then
@@ -50,10 +54,14 @@ then
 fi
 for i in $( seq 1 $NUMFILES)
 do
-	./writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"
+	# Executables are on the PATH (installed to /usr/bin), so call them by name.
+	writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"
 done
 
-OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
+OUTPUTSTRING=$(finder.sh "$WRITEDIR" "$WRITESTR")
+
+# Assignment 4: save the finder output to /tmp/assignment4-result.txt
+echo "${OUTPUTSTRING}" > /tmp/assignment4-result.txt
 
 # remove temporary directories
 rm -rf /tmp/aeld-data
