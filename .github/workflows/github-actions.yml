@@ -16,7 +16,12 @@ jobs:
           - name: Run unit test
             run: ./unit-test.sh
     full-test:
-        container: cuaesd/aesd-autotest:24-assignment5
+        container:
+            image: cuaesd/aesd-autotest:24-assignment5
+            # Cap the file-descriptor limit. The self-hosted runner's Docker
+            # daemon defaults RLIMIT_NOFILE to ~1e9, which trips a valgrind bug
+            # (vgPlain_safe_fd assertion / SIGSEGV) before the test even runs.
+            options: --ulimit nofile=1024:524288
         runs-on: self-hosted
         steps:
           - uses: actions/checkout@v2
